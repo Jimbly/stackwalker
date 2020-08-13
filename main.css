@@ -1,0 +1,46 @@
+html, body {
+  font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+#debug {
+  white-space: pre-wrap;
+}
+
+.hflex {
+  display: flex;
+  flex-direction: row;
+}
+
+.vflex {
+  display: flex;
+  flex-direction: column;
+}
+
+.fluid {
+  flex: 1;
+}
+
+.flexcenter {
+  align-self: center;
+}
+
+textarea,select {
+  white-space: pre;
+  width:500px;
+}
+
+#sourcecode {
+  height: 100%;
+  background-color: #EEE;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: monospace;
+  padding: 0px;
+}
+
+#source_line {
+  background-color: #FF4;
+}

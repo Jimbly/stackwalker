@@ -1,0 +1,14 @@
+data_store/
+artifacts/
+node_modules/
+logs/
+ynpm-debug.log
+npm-debug.log
+build.dev/
+build.prod/
+build.intermediate/
+*.sublime-workspace
+Bfxr
+*.00?
+src/client/autogen/
+.DS_Store

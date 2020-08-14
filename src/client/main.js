@@ -6,11 +6,19 @@ const querystring = require('query-string');
 const stack_mapper = require('stack-mapper');
 
 let error_report_regex = /^([^ ]+) \[([^\]]+)] "POST ([^"?]+)?([^"]+)" START "([^"]+)" "([^"]+)"$/;
-let fileline_regex1 = /(.)([^(/:]+)\((\d+):(\d+)\)$/;
-let fileline_regex2 = /(?:at ([^(]+) \(.*\/)?([^(/:]+):(\d+)(?::(\d+))?\)$/;
+let fileline_regexs = [
+  /(.)([^(/:]+)\((\d+):(\d+)\)$/,
+  /(?:at ([^(]+) \(.*\/)?([^(/:]+):(\d+)(?::(\d+))?\)$/,
+  /\/*([^/@]+)\/*@.*\/([^(/:]+):(\d+)(?::(\d+))?$/,
+  /()([^(/:]+):(\d+):(\d+)?$/,
+];
 
 function prettyFileLine(a) {
-  return `${a.fn || ''} (${a.filename}:${a.line}:${a.column})`;
+  if (a.fn) {
+    return `${a.fn} (${a.filename}:${a.line}:${a.column})`;
+  } else {
+    return `${a.filename}:${a.line}:${a.column}`;
+  }
 }
 
 function preparse(text) {
@@ -43,6 +51,9 @@ function preparse(text) {
     if (query.ver) {
       header.push(`ver=${query.ver}`);
     }
+    if (query.user_id) {
+      header.push(`user_id=${query.user_id}`);
+    }
     if (header.length) {
       ret.push(header.join(', '));
     }
@@ -62,13 +73,16 @@ function parseStack(text) {
   text = preparse(text);
   let lines = text.split('\n');
   lines = lines.map((line) => {
-    let m = line.match(fileline_regex1) || line.match(fileline_regex2);
+    let m;
+    for (let ii = 0; !m && ii < fileline_regexs.length; ++ii) {
+      m = line.match(fileline_regexs[ii]);
+    }
     if (m) {
       return {
         fn: m[1],
         filename: m[2],
         line: m[3],
-        column: m[4] ? Number(m[4]) - 1 : undefined, // the - 1 seems to help in some cases
+        column: m[4] ? Number(m[4]) : undefined,
         tooltip: line,
       };
     }
@@ -87,6 +101,7 @@ export function main() {
   let source_pre = document.getElementById('source_pre');
   let source_line = document.getElementById('source_line');
   let source_post = document.getElementById('source_post');
+  let fileinfo = document.getElementById('fileinfo');
 
   let stack_data;
   let sourcemap_data;
@@ -119,7 +134,11 @@ export function main() {
       let elem = stack_frames[ii];
       if (elem.filename) {
         line_mapping[ii] = to_process.length;
-        to_process.push(elem);
+        to_process.push({
+          filename: elem.filename,
+          line: elem.line,
+          column: elem.column ? elem.column - 1 : undefined, // the - 1 seems to help map to the right line a lot
+        });
       }
     }
     let out = stackmapper.map(to_process);
@@ -142,16 +161,17 @@ export function main() {
     let lineinfo = mapped_stack && mapped_stack[idx];
     if (!sourcemap_data) {
       source_pre.textContent = 'No sourcemap loaded';
-      source_line.textContent = source_post.textContent = '';
+      source_line.textContent = source_post.textContent = fileinfo.textContent = '';
       return;
     }
     if (!lineinfo) {
       source_pre.textContent = 'No source selected';
-      source_line.textContent = source_post.textContent = '';
+      source_line.textContent = source_post.textContent = fileinfo.textContent = '';
       return;
     }
     let { sources, sourcesContent } = sourcemap_data;
     let { filename, line } = lineinfo;
+    fileinfo.textContent = `File: ${filename}`;
     let found = -1;
     for (let ii = 0; ii < sources.length; ++ii) {
       if (sources[ii].endsWith(filename)) {

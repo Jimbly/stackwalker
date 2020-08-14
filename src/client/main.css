@@ -44,3 +44,9 @@ textarea,select {
 #source_line {
   background-color: #FF4;
 }
+
+#fileinfo {
+  padding: 2px;
+  background-color: #444;
+  color: #FFF;
+}

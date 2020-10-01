@@ -13,11 +13,15 @@
           Sourcemap: <input type="file" id="upload" accept=".map"><br/>
           <span id="upload_status" style="visibility: hidden">Status: Sourcemap required</span><br/>
           Stack / Error reports:<br/>
-          <textarea id="stack" rows=15></textarea><br/>
+          <textarea id="stack" rows=5></textarea><br/>
+          Ignore:<br/>
+          <textarea id="ignore" rows=3></textarea><br/>
           Bundle frames:<br/>
           <select multiple="yes" id="frames_bundle" size=15></select><br/>
           Source frames:<br/>
           <select multiple="yes" id="frames_source" size=15></select><br/>
+          Selected line:<br/>
+          <input id="selected_line"><br/>
         </div>
       </div>
       <div class="fluid" style="margin-left: 4px; min-height: 100%; min-width: 20px;">

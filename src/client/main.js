@@ -1,4 +1,5 @@
 /* eslint no-useless-catch:off */
+const assert = require('assert');
 const local_storage = require('./glov/local_storage.js');
 local_storage.storage_prefix = 'stackwalker';
 
@@ -21,11 +22,106 @@ function prettyFileLine(a) {
   }
 }
 
-function preparse(text) {
+function parseIgnoreList(text) {
+  let lines = text.split('\n').filter((a) => a.trim());
+  return lines.map((a) => {
+    if (a[0] === '/') {
+      return new RegExp(a);
+    } else {
+      return a;
+    }
+  });
+}
+
+function jsonParse(text) {
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    return null;
+  }
+}
+
+function headerFromQuery(query) {
+  let header = [];
+  if (query.cidx && query.cidx !== '1') {
+    header.push(`CIDX=${query.cidx}`);
+  }
+  if (query.ver) {
+    header.push(`ver=${query.ver}`);
+  }
+  if (query.user_id) {
+    header.push(`user_id=${query.user_id}`);
+  }
+  return header;
+}
+
+function ignored(list, text) {
+  for (let ii = 0; ii < list.length; ++ii) {
+    if (list[ii] instanceof RegExp) {
+      if (text.match(list[ii])) {
+        return true;
+      }
+    } else if (text.indexOf(list[ii]) !== -1) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function userURL(url) {
+  let m = url.match(/[^?]+\/(.*)/);
+  if (m) {
+    return m[1];
+  }
+  return url;
+}
+
+function preparseGcloud(json, ignore_list) {
+  let ret = [];
+  let ignore_cidx = ignore_list.indexOf('CIDX') !== -1;
+  for (let ii = 0; ii < json.length; ++ii) {
+    let record = json[ii];
+    let { timestamp } = record;
+    let query = record.jsonPayload;
+    assert(query);
+    if (ignored(ignore_list, query.msg)) {
+      continue;
+    }
+    if (ignore_cidx && query.cidx && query.cidx !== '1') {
+      continue;
+    }
+    ret.push(`User URL=${userURL(query.url)}, UA=${query.ua}, timestamp=${timestamp}`);
+    let header = headerFromQuery(query);
+    if (header.length) {
+      ret.push(header.join(', '));
+    }
+    if (query.file) {
+      ret.push(prettyFileLine({
+        filename: query.file.match(/[^/]+$/)[0],
+        line: query.line,
+        column: query.col,
+      }));
+    }
+    ret = ret.concat(query.msg.split('\n'));
+
+    ret.push('');
+  }
+
+  return ret.join('\n');
+}
+
+function preparse(text, ignore_list) {
+  let json;
+  if (text[0] === '[' && (json = jsonParse(text))) {
+    return preparseGcloud(json, ignore_list);
+  }
   let lines = text.split('\n');
   let ret = [];
   for (let ii = 0; ii < lines.length; ++ii) {
     let line = lines[ii];
+    if (ignored(ignore_list, line)) {
+      continue;
+    }
     let m = line.match(error_report_regex);
     if (!m) {
       ret.push(line);
@@ -41,19 +137,10 @@ function preparse(text) {
     // Source URL line
     if (query.url) {
       ret.push('');
-      ret.push(`User URL=${query.url}, UA=${useragent}`);
+      ret.push(`User URL=${userURL(query.url)}, UA=${useragent}`);
     }
     // Header line
-    let header = [];
-    if (query.cidx && query.cidx !== '1') {
-      header.push(`CIDX=${query.cidx}`);
-    }
-    if (query.ver) {
-      header.push(`ver=${query.ver}`);
-    }
-    if (query.user_id) {
-      header.push(`user_id=${query.user_id}`);
-    }
+    let header = headerFromQuery(query);
     if (header.length) {
       ret.push(header.join(', '));
     }
@@ -69,8 +156,8 @@ function preparse(text) {
   return ret.join('\n');
 }
 
-function parseStack(text) {
-  text = preparse(text);
+function parseStack(text, ignore_list) {
+  text = preparse(text, ignore_list);
   let lines = text.split('\n');
   lines = lines.map((line) => {
     let m;
@@ -95,6 +182,7 @@ export function main() {
   let upload = document.getElementById('upload');
   let upload_status = document.getElementById('upload_status');
   let stack = document.getElementById('stack');
+  let ignore = document.getElementById('ignore');
   let frames_bundle = document.getElementById('frames_bundle');
   let frames_source = document.getElementById('frames_source');
   let sourcecode = document.getElementById('sourcecode');
@@ -102,15 +190,20 @@ export function main() {
   let source_line = document.getElementById('source_line');
   let source_post = document.getElementById('source_post');
   let fileinfo = document.getElementById('fileinfo');
+  let selected_line = document.getElementById('selected_line');
 
   let stack_data;
+  let ignore_data;
   let sourcemap_data;
   let stackmapper;
 
-  function toOptions(list) {
+  let raw_lines;
+  function toOptions(list, skip_disabled) {
+    raw_lines = [];
     return list.map((a) => {
       let str = a.err !== undefined ? a.err : prettyFileLine(a);
-      return `<option${a.err ? ' disabled' : ''}` +
+      raw_lines.push(str);
+      return `<option${a.err ? ' class="disabled"' : ''}` +
         `${a.tooltip?` title="${a.tooltip.replace(/"/g, '&quot;')}"`:''}` +
         `>${str}</option>`;
     }).join('\n');
@@ -120,8 +213,10 @@ export function main() {
 
   function update() {
     // window.debugmsg('', true);
-    let stack_frames = parseStack(stack_data);
-    frames_bundle.innerHTML = toOptions(stack_frames);
+    let ignore_list = parseIgnoreList(ignore_data);
+    let stack_frames = parseStack(stack_data, ignore_list);
+    frames_bundle.innerHTML = toOptions(stack_frames, true);
+    frames_bundle.raw_lines = raw_lines;
 
     mapped_stack = null;
     if (!stackmapper) {
@@ -154,6 +249,7 @@ export function main() {
       }
     }
     frames_source.innerHTML = toOptions(out_lines);
+    frames_source.raw_lines = raw_lines;
   }
 
   function updateFocus() {
@@ -196,6 +292,9 @@ export function main() {
 
   upload.addEventListener('change', (ev) => {
     let file_to_load = upload.files[0];
+    if (!file_to_load) {
+      return;
+    }
     let reader = new FileReader();
     local_storage.set('sourcemap', undefined);
     sourcemap_data = null;
@@ -230,6 +329,15 @@ export function main() {
   stack.addEventListener('input', onStackChange);
   stack.value = stack_data = local_storage.get('stack') || '';
 
+  function onIgnoreChange(ev) {
+    ignore_data = ev.target.value;
+    local_storage.set('ignore', ignore_data);
+    update();
+  }
+  ignore.addEventListener('change', onIgnoreChange);
+  ignore.addEventListener('input', onIgnoreChange);
+  ignore.value = ignore_data = local_storage.get('ignore') || '';
+
   function onFramesChange(ev) {
     let idx = ev.target.selectedIndex;
     if (frames_bundle.selectedIndex !== idx) {
@@ -244,6 +352,12 @@ export function main() {
   //frames_bundle.addEventListener('input', onFramesChange);
   frames_source.addEventListener('change', onFramesChange);
   //frames_source.addEventListener('input', onFramesChange);
+  frames_bundle.addEventListener('change', (ev) => {
+    selected_line.value = frames_bundle.raw_lines[ev.target.selectedIndex];
+  });
+  frames_source.addEventListener('change', (ev) => {
+    selected_line.value = frames_source.raw_lines[ev.target.selectedIndex];
+  });
 
   //sourcemap_data = local_storage.getJSON('sourcemap');
   if (sourcemap_data && sourcemap_data.version === 3) {

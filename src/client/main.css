@@ -27,7 +27,7 @@ html, body {
   align-self: center;
 }
 
-textarea,select {
+textarea,select,input {
   white-space: pre;
   width:500px;
 }
@@ -49,4 +49,7 @@ textarea,select {
   padding: 2px;
   background-color: #444;
   color: #FFF;
+}
+option.disabled {
+  color: #888;
 }

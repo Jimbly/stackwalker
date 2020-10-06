@@ -56,6 +56,9 @@ function headerFromQuery(query) {
 }
 
 function ignored(list, text) {
+  if (!text) {
+    return false;
+  }
   for (let ii = 0; ii < list.length; ++ii) {
     if (list[ii] instanceof RegExp) {
       if (text.match(list[ii])) {
@@ -321,10 +324,23 @@ export function main() {
   });
 
   function onStackChange(ev) {
-    stack_data = ev.target.value;
-    local_storage.set('stack', stack_data);
-    update();
+    if (ev.target.value.startsWith('(loaded ')) {
+      // ignore, leave stack_data
+    } else {
+      stack_data = ev.target.value;
+      local_storage.set('stack', stack_data);
+      update();
+    }
   }
+  stack.addEventListener('textInput', (ev) => {
+    let text = ev.data;
+    if (text.length > 1000) {
+      stack_data = text;
+      ev.target.value = `(loaded ${text.length} bytes)`;
+      ev.preventDefault();
+      update();
+    }
+  });
   stack.addEventListener('change', onStackChange);
   stack.addEventListener('input', onStackChange);
   stack.value = stack_data = local_storage.get('stack') || '';

@@ -99,8 +99,9 @@ function preparseGcloud(json, ignore_list) {
       ret.push(header.join(', '));
     }
     if (query.file) {
+      let m = query.file.match(/[^/]+$/);
       ret.push(prettyFileLine({
-        filename: query.file.match(/[^/]+$/)[0],
+        filename: m && m[0],
         line: query.line,
         column: query.col,
       }));
@@ -335,6 +336,7 @@ export function main() {
   stack.addEventListener('textInput', (ev) => {
     let text = ev.data;
     if (text.length > 1000) {
+      // large paste, just store the data but don't add it to the DOM
       stack_data = text;
       ev.target.value = `(loaded ${text.length} bytes)`;
       ev.preventDefault();

@@ -46,11 +46,17 @@ function headerFromQuery(query) {
   if (query.cidx && query.cidx !== '1') {
     header.push(`CIDX=${query.cidx}`);
   }
+  if (query.disconnected) {
+    header.push('DISCONNECTED');
+  }
   if (query.ver) {
     header.push(`ver=${query.ver}`);
   }
   if (query.user_id) {
     header.push(`user_id=${query.user_id}`);
+  }
+  if (query.client_id) {
+    header.push(`client_id=${query.client_id}`);
   }
   return header;
 }
@@ -82,6 +88,7 @@ function userURL(url) {
 function preparseGcloud(json, ignore_list) {
   let ret = [];
   let ignore_cidx = ignore_list.indexOf('CIDX') !== -1;
+  let ignore_disconnected = ignore_list.indexOf('DISCONNECTED') !== -1;
   for (let ii = 0; ii < json.length; ++ii) {
     let record = json[ii];
     let { timestamp } = record;
@@ -91,6 +98,9 @@ function preparseGcloud(json, ignore_list) {
       continue;
     }
     if (ignore_cidx && query.cidx && query.cidx !== '1') {
+      continue;
+    }
+    if (ignore_disconnected && query.disconnected) {
       continue;
     }
     ret.push(`User URL=${userURL(query.url)}, UA=${query.ua}, timestamp=${timestamp}`);

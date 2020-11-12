@@ -9,10 +9,12 @@ const stack_mapper = require('stack-mapper');
 let error_report_regex = /^([^ ]+) \[([^\]]+)] "POST ([^"?]+)?([^"]+)" START "([^"]+)" "([^"]+)"$/;
 let fileline_regexs = [
   /(.)([^(/:]+)\((\d+):(\d+)\)$/,
-  /(?:at ([^(]+) \(.*\/)?([^(/:]+):(\d+)(?::(\d+))?\)$/,
+  ///(?:at ([^(]+) \(.*\/)?([^(/:]+):(\d+)(?::(\d+))?\)$/,
+  /(?:at ([^(]+) \((?:.*\/)?)?([^(/:]+):(\d+)(?::(\d+))?\)$/,
   /\/*([^/@]+)\/*@.*\/([^(/:]+):(\d+)(?::(\d+))?$/,
   /()([^(/:]+):(\d+):(\d+)?$/,
 ];
+// at Object.replaceVideoShadowStyle (<anonymous>:1:3601)
 
 function prettyFileLine(a) {
   if (a.fn) {
@@ -57,6 +59,17 @@ function headerFromQuery(query) {
   }
   if (query.client_id) {
     header.push(`client_id=${query.client_id}`);
+  }
+  return header;
+}
+
+function header2FromQuery(query) {
+  let header = [];
+  if (query.webgl) {
+    header.push(`WebGL${query.webgl}`);
+  }
+  if (query.renderer_unmasked) {
+    header.push(query.renderer_unmasked);
   }
   return header;
 }
@@ -107,6 +120,10 @@ function preparseGcloud(json, ignore_list) {
     let header = headerFromQuery(query);
     if (header.length) {
       ret.push(header.join(', '));
+    }
+    let header2 = header2FromQuery(query);
+    if (header2.length) {
+      ret.push(header2.join(', '));
     }
     if (query.file) {
       let m = query.file.match(/[^/]+$/);
@@ -218,8 +235,8 @@ export function main() {
       let str = a.err !== undefined ? a.err : prettyFileLine(a);
       raw_lines.push(str);
       return `<option${a.err ? ' class="disabled"' : ''}` +
-        `${a.tooltip?` title="${a.tooltip.replace(/"/g, '&quot;')}"`:''}` +
-        `>${str}</option>`;
+        `${a.tooltip?` title="${a.tooltip.replace(/"/g, '&quot;').replace(/</g, '&lt;')}"`:''}` +
+        `>${str.replace(/</g, '&lt;')}</option>`;
     }).join('\n');
   }
 

@@ -210,7 +210,11 @@ function parseStack(text, ignore_list) {
 }
 
 export function main() {
-  let upload = document.getElementById('upload');
+  let uploads = [
+    document.getElementById('upload1'),
+    document.getElementById('upload2'),
+    document.getElementById('upload3'),
+  ];
   let upload_status = document.getElementById('upload_status');
   let stack = document.getElementById('stack');
   let ignore = document.getElementById('ignore');
@@ -225,8 +229,8 @@ export function main() {
 
   let stack_data;
   let ignore_data;
-  let sourcemap_data;
-  let stackmapper;
+  let sourcemap_data = [];
+  let stackmapper = [];
 
   let raw_lines;
   function toOptions(list, skip_disabled) {
@@ -250,7 +254,7 @@ export function main() {
     frames_bundle.raw_lines = raw_lines;
 
     mapped_stack = null;
-    if (!stackmapper) {
+    if (!stackmapper[0] && !stackmapper[1] && !stackmapper[2]) {
       frames_source.innerHTML = toOptions([{ err: 'Missing sourcemap' }]);
       return;
     }
@@ -267,7 +271,15 @@ export function main() {
         });
       }
     }
-    let out = stackmapper.map(to_process);
+    let outs = [];
+    for (let ii = 0; ii < stackmapper.length; ++ii) {
+      if (stackmapper[ii]) {
+        outs[ii] = stackmapper[ii].map(to_process);
+        for (let jj = 0; jj < outs[ii].length; ++jj) {
+          assert.equal(outs[ii][jj], to_process[jj]); // this modifies in-place
+        }
+      }
+    }
     let out_lines = [];
     mapped_stack = [];
     for (let ii = 0; ii < stack_frames.length; ++ii) {
@@ -275,8 +287,9 @@ export function main() {
         mapped_stack.push(null);
         out_lines.push({ err: '' });
       } else {
-        mapped_stack.push(out[line_mapping[ii]]);
-        out_lines.push(out[line_mapping[ii]]);
+        let mapped = to_process[line_mapping[ii]];
+        mapped_stack.push(mapped);
+        out_lines.push(mapped);
       }
     }
     frames_source.innerHTML = toOptions(out_lines);
@@ -286,7 +299,7 @@ export function main() {
   function updateFocus() {
     let idx = frames_bundle.selectedIndex;
     let lineinfo = mapped_stack && mapped_stack[idx];
-    if (!sourcemap_data) {
+    if (!sourcemap_data[0] && !sourcemap_data[1] && !sourcemap_data[2]) {
       source_pre.textContent = 'No sourcemap loaded';
       source_line.textContent = source_post.textContent = fileinfo.textContent = '';
       return;
@@ -296,59 +309,64 @@ export function main() {
       source_line.textContent = source_post.textContent = fileinfo.textContent = '';
       return;
     }
-    let { sources, sourcesContent } = sourcemap_data;
     let { filename, line } = lineinfo;
-    fileinfo.textContent = `File: ${filename}`;
-    let found = -1;
-    for (let ii = 0; ii < sources.length; ++ii) {
-      if (sources[ii].endsWith(filename)) {
-        found = ii;
+    for (let jj = 0; jj < sourcemap_data.length; ++jj) {
+      let { sources, sourcesContent } = sourcemap_data[jj];
+      fileinfo.textContent = `File: ${filename}`;
+      let found = -1;
+      for (let ii = 0; ii < sources.length; ++ii) {
+        if (sources[ii].endsWith(filename)) {
+          found = ii;
+        }
       }
-    }
-    if (found === -1 || !sourcesContent[found]) {
-      source_pre.textContent = `Could not find ${filename} in sourcemap.sources`;
-      source_line.textContent = source_post.textContent = '';
+      if (found === -1 || !sourcesContent[found]) {
+        continue;
+      }
+      let lines = sourcesContent[found].split('\n');
+      source_pre.textContent = lines.slice(0, line - 1).join('\n');
+      source_line.textContent = lines[line - 1];
+      source_post.textContent = lines.slice(line, lines.length).join('\n');
+      source_line.scrollIntoView(true);
+      let st = sourcecode.scrollTop;
+      source_line.scrollIntoView(false);
+      st += sourcecode.scrollTop;
+      sourcecode.scrollTop = Math.round(st / 2);
       return;
     }
-    let lines = sourcesContent[found].split('\n');
-    source_pre.textContent = lines.slice(0, line - 1).join('\n');
-    source_line.textContent = lines[line - 1];
-    source_post.textContent = lines.slice(line, lines.length).join('\n');
-    source_line.scrollIntoView(true);
-    let st = sourcecode.scrollTop;
-    source_line.scrollIntoView(false);
-    st += sourcecode.scrollTop;
-    sourcecode.scrollTop = Math.round(st / 2);
+    source_pre.textContent = `Could not find ${filename} in sourcemap.sources`;
+    source_line.textContent = source_post.textContent = '';
   }
 
-  upload.addEventListener('change', (ev) => {
-    let file_to_load = upload.files[0];
-    if (!file_to_load) {
-      return;
-    }
-    let reader = new FileReader();
-    local_storage.set('sourcemap', undefined);
-    sourcemap_data = null;
-    stackmapper = null;
-    reader.onload = (loaded_event) => {
-      let text = loaded_event.target.result;
-      try {
-        sourcemap_data = JSON.parse(text);
-      } catch (e) {
-        upload_status.textContent = 'Status: Error parsing Sourcemap';
-        throw e;
+  uploads.forEach((elem, idx) => {
+    elem.addEventListener('change', (ev) => {
+      let file_to_load = elem.files[0];
+      if (!file_to_load) {
+        return;
       }
-      if (sourcemap_data && sourcemap_data.version === 3) {
-        upload_status.textContent = 'Status: Sourcemap loaded';
-        stackmapper = stack_mapper(sourcemap_data);
-        //local_storage.setJSON('sourcemap', sourcemap_data);
-      } else {
-        upload_status.textContent = 'Status: Error parsing Sourcemap (expected version: 3)';
-      }
-      update();
-    };
+      let reader = new FileReader();
+      local_storage.set('sourcemap', undefined);
+      sourcemap_data[idx] = null;
+      stackmapper[idx] = null;
+      reader.onload = (loaded_event) => {
+        let text = loaded_event.target.result;
+        try {
+          sourcemap_data[idx] = JSON.parse(text);
+        } catch (e) {
+          upload_status.textContent = 'Status: Error parsing Sourcemap';
+          throw e;
+        }
+        if (sourcemap_data[idx] && sourcemap_data[idx].version === 3) {
+          upload_status.textContent = 'Status: Sourcemap loaded';
+          stackmapper[idx] = stack_mapper(sourcemap_data[idx]);
+          //local_storage.setJSON('sourcemap', sourcemap_data);
+        } else {
+          upload_status.textContent = 'Status: Error parsing Sourcemap (expected version: 3)';
+        }
+        update();
+      };
 
-    reader.readAsText(file_to_load, 'UTF-8');
+      reader.readAsText(file_to_load, 'UTF-8');
+    });
   });
 
   function onStackChange(ev) {
@@ -405,7 +423,7 @@ export function main() {
   });
 
   //sourcemap_data = local_storage.getJSON('sourcemap');
-  if (sourcemap_data && sourcemap_data.version === 3) {
+  if (sourcemap_data[0] && sourcemap_data[0].version === 3) {
     upload_status.textContent = 'Status: Sourcemap loaded from local storage';
   }
 

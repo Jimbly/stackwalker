@@ -14,6 +14,7 @@ module.exports = {
     "Blob": true,
     "Image": true,
     "FileReader": true,
+    "XMLHttpRequest": true,
     // Our engine globals
     "gl": true,
     "Z": true,

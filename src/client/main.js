@@ -98,6 +98,39 @@ function userURL(url) {
   return url;
 }
 
+let setSourcemapData;
+let upload_status;
+const SOURCEMAP_SERVER = 'http://localhost:3500/sourcemap/';
+function autoloadSourcemap(path) {
+  if (!SOURCEMAP_SERVER) {
+    return;
+  }
+  let xhr = new XMLHttpRequest();
+  xhr.withCredentials = false;
+  xhr.open('GET', `${SOURCEMAP_SERVER}${path}`, true);
+  xhr.onload = () => {
+    setSourcemapData(-1, xhr.responseText);
+    upload_status.textContent = `Auto-loaded ${path}`;
+  };
+  xhr.onerror = () => {
+    upload_status.textContent = `Error auto-loading ${path}`;
+  };
+  xhr.send(null);
+}
+
+let autoloaded_sourcemaps = {};
+function autoloadSourcemapsForVersion(cluster, ver) {
+  let key = `${cluster}#${ver}`;
+  if (autoloaded_sourcemaps[key]) {
+    return;
+  }
+  autoloaded_sourcemaps[key] = true;
+
+  autoloadSourcemap(`${cluster}/${ver}/app.bundle.js.map`);
+  autoloadSourcemap(`${cluster}/${ver}/app_deps.bundle.js.map`);
+  autoloadSourcemap(`${cluster}/${ver}/worker.bundle.js.map`);
+}
+
 function preparseGcloud(json, ignore_list) {
   let ret = [];
   let ignore_cidx = ignore_list.indexOf('CIDX') !== -1;
@@ -107,6 +140,9 @@ function preparseGcloud(json, ignore_list) {
     let { timestamp } = record;
     let query = record.jsonPayload;
     assert(query);
+    if (query.payload) {
+      query = query.payload;
+    }
     if (ignored(ignore_list, query.msg)) {
       continue;
     }
@@ -115,6 +151,9 @@ function preparseGcloud(json, ignore_list) {
     }
     if (ignore_disconnected && query.disconnected) {
       continue;
+    }
+    if (query.ver && record.resource?.labels?.cluster_name) {
+      autoloadSourcemapsForVersion(record.resource.labels.cluster_name, query.ver);
     }
     ret.push(`User URL=${userURL(query.url)}, UA=${query.ua}, timestamp=${timestamp}`);
     let header = headerFromQuery(query);
@@ -215,7 +254,7 @@ export function main() {
     document.getElementById('upload2'),
     document.getElementById('upload3'),
   ];
-  let upload_status = document.getElementById('upload_status');
+  upload_status = document.getElementById('upload_status');
   let stack = document.getElementById('stack');
   let ignore = document.getElementById('ignore');
   let frames_bundle = document.getElementById('frames_bundle');
@@ -254,7 +293,14 @@ export function main() {
     frames_bundle.raw_lines = raw_lines;
 
     mapped_stack = null;
-    if (!stackmapper[0] && !stackmapper[1] && !stackmapper[2]) {
+    let any_stackmapper = false;
+    for (let ii = 0; ii < stackmapper.length; ++ii) {
+      if (stackmapper[ii]) {
+        any_stackmapper = true;
+        break;
+      }
+    }
+    if (!any_stackmapper) {
       frames_source.innerHTML = toOptions([{ err: 'Missing sourcemap' }]);
       return;
     }
@@ -296,23 +342,42 @@ export function main() {
     frames_source.raw_lines = raw_lines;
   }
 
+  setSourcemapData = function (idx, text) {
+    if (idx === -1) {
+      idx = Math.max(3, sourcemap_data.length);
+    }
+    try {
+      sourcemap_data[idx] = JSON.parse(text);
+    } catch (e) {
+      upload_status.textContent = 'Status: Error parsing Sourcemap';
+      throw e;
+    }
+    if (sourcemap_data[idx] && sourcemap_data[idx].version === 3) {
+      upload_status.textContent = 'Status: Sourcemap loaded';
+      stackmapper[idx] = stack_mapper(sourcemap_data[idx]);
+      //local_storage.setJSON('sourcemap', sourcemap_data);
+    } else {
+      upload_status.textContent = 'Status: Error parsing Sourcemap (expected version: 3)';
+    }
+    update();
+  };
+
   function updateFocus() {
     let idx = frames_bundle.selectedIndex;
     let lineinfo = mapped_stack && mapped_stack[idx];
-    if (!sourcemap_data[0] && !sourcemap_data[1] && !sourcemap_data[2]) {
-      source_pre.textContent = 'No sourcemap loaded';
-      source_line.textContent = source_post.textContent = fileinfo.textContent = '';
-      return;
-    }
     if (!lineinfo) {
       source_pre.textContent = 'No source selected';
       source_line.textContent = source_post.textContent = fileinfo.textContent = '';
       return;
     }
     let { filename, line } = lineinfo;
+    let any_sourcemap = false;
     for (let jj = 0; jj < sourcemap_data.length; ++jj) {
+      if (!sourcemap_data[jj]) {
+        continue;
+      }
+      any_sourcemap = true;
       let { sources, sourcesContent } = sourcemap_data[jj];
-      fileinfo.textContent = `File: ${filename}`;
       let found = -1;
       for (let ii = 0; ii < sources.length; ++ii) {
         if (sources[ii].endsWith(filename)) {
@@ -322,6 +387,7 @@ export function main() {
       if (found === -1 || !sourcesContent[found]) {
         continue;
       }
+      fileinfo.textContent = `File: ${filename}`;
       let lines = sourcesContent[found].split('\n');
       source_pre.textContent = lines.slice(0, line - 1).join('\n');
       source_line.textContent = lines[line - 1];
@@ -333,8 +399,13 @@ export function main() {
       sourcecode.scrollTop = Math.round(st / 2);
       return;
     }
-    source_pre.textContent = `Could not find ${filename} in sourcemap.sources`;
-    source_line.textContent = source_post.textContent = '';
+    if (!any_sourcemap) {
+      source_pre.textContent = 'No sourcemap loaded';
+      source_line.textContent = source_post.textContent = fileinfo.textContent = '';
+    } else {
+      source_pre.textContent = `Could not find ${filename} in sourcemap.sources`;
+      source_line.textContent = source_post.textContent = '';
+    }
   }
 
   uploads.forEach((elem, idx) => {
@@ -349,20 +420,7 @@ export function main() {
       stackmapper[idx] = null;
       reader.onload = (loaded_event) => {
         let text = loaded_event.target.result;
-        try {
-          sourcemap_data[idx] = JSON.parse(text);
-        } catch (e) {
-          upload_status.textContent = 'Status: Error parsing Sourcemap';
-          throw e;
-        }
-        if (sourcemap_data[idx] && sourcemap_data[idx].version === 3) {
-          upload_status.textContent = 'Status: Sourcemap loaded';
-          stackmapper[idx] = stack_mapper(sourcemap_data[idx]);
-          //local_storage.setJSON('sourcemap', sourcemap_data);
-        } else {
-          upload_status.textContent = 'Status: Error parsing Sourcemap (expected version: 3)';
-        }
-        update();
+        setSourcemapData(idx, text);
       };
 
       reader.readAsText(file_to_load, 'UTF-8');
@@ -380,7 +438,7 @@ export function main() {
   }
   stack.addEventListener('textInput', (ev) => {
     let text = ev.data;
-    if (text.length > 1000) {
+    if (text.length > 10000) {
       // large paste, just store the data but don't add it to the DOM
       stack_data = text;
       ev.target.value = `(loaded ${text.length} bytes)`;

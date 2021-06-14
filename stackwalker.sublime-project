@@ -6,11 +6,7 @@
             "folder_exclude_patterns":
             [
                 "node_modules",
-                "build.dev",
-                "build.intermediate",
-                "build.prod",
-                "logs",
-                "data_store",
+                "dist",
             ],
             "file_exclude_patterns": ["jquery-*.min*", "*.00?", "*.wav", "*.mp3", "*.ogg", "package-lock.json", "*.glb"],
             "path": "."

@@ -1,7 +1,7 @@
 /* eslint no-useless-catch:off */
 const assert = require('assert');
 const local_storage = require('./glov/local_storage.js');
-local_storage.storage_prefix = 'stackwalker';
+local_storage.setStoragePrefix('stackwalker'); // Before requiring anything else that might load from this
 
 const querystring = require('query-string');
 const stack_mapper = require('stack-mapper');

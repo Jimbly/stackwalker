@@ -53,3 +53,6 @@ textarea,select,input {
 option.disabled {
   color: #888;
 }
+#upload_status {
+  color: #888;
+}

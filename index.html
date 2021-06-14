@@ -13,7 +13,7 @@
           Sourcemap(s): <input type="file" id="upload1" class="upload" accept=".map"><br/>
           <input type="file" id="upload2" class="upload" accept=".map"><br/>
           <input type="file" id="upload3" class="upload" accept=".map"><br/>
-          <span id="upload_status" style="visibility: hidden">Status: Sourcemap required</span><br/>
+          <span id="upload_status"></span><br/>
           Stack / Error reports:<br/>
           <textarea id="stack" rows=5></textarea><br/>
           Ignore:<br/>
@@ -33,7 +33,8 @@
         </div>
       </div>
     </div>
-    
+    <!-- build:js vendor/combined.js -->
+    <!-- endbuild -->
     <script src="app_deps.bundle.js"></script>
     <script src="app.bundle.js"></script>
   </body>

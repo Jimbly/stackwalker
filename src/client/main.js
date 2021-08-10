@@ -131,6 +131,13 @@ function autoloadSourcemapsForVersion(cluster, ver) {
   autoloadSourcemap(`${cluster}/${ver}/worker.bundle.js.map`);
 }
 
+function cleanTimestamp(timestamp) {
+  if (timestamp && timestamp.length && timestamp.length > 23 && timestamp.endsWith('Z')) {
+    return `${timestamp.slice(0, 23)}Z`;
+  }
+  return timestamp;
+}
+
 function preparseGcloud(json, ignore_list) {
   let ret = [];
   let ignore_cidx = ignore_list.indexOf('CIDX') !== -1;
@@ -155,7 +162,8 @@ function preparseGcloud(json, ignore_list) {
     if (query.ver && record.resource?.labels?.cluster_name) {
       autoloadSourcemapsForVersion(record.resource.labels.cluster_name, query.ver);
     }
-    ret.push(`User URL=${userURL(query.url)}, UA=${query.ua}, timestamp=${timestamp}`);
+    ret.push(`${cleanTimestamp(timestamp)}${query.pos ? ` pos=${query.pos}` : ''} URL=${userURL(query.url)}`);
+    ret.push(`UserAgent=${query.ua}`);
     let header = headerFromQuery(query);
     if (header.length) {
       ret.push(header.join(', '));

@@ -370,6 +370,14 @@ export function main() {
     update();
   };
 
+  function looseFilenameMatch(a, b) {
+    if (a.endsWith(b)) {
+      let prechar = a.slice(-b.length - 1, -b.length);
+      return !prechar || prechar === '/' || prechar === '\\';
+    }
+    return false;
+  }
+
   function updateFocus() {
     let idx = frames_bundle.selectedIndex;
     let lineinfo = mapped_stack && mapped_stack[idx];
@@ -386,9 +394,9 @@ export function main() {
       }
       any_sourcemap = true;
       let { sources, sourcesContent } = sourcemap_data[jj];
-      let found = -1;
-      for (let ii = 0; ii < sources.length; ++ii) {
-        if (sources[ii].endsWith(filename)) {
+      let found = sources.indexOf(filename);
+      for (let ii = 0; found === -1 && ii < sources.length; ++ii) {
+        if (looseFilenameMatch(sources[ii], filename)) {
           found = ii;
         }
       }

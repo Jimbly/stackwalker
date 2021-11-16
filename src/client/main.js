@@ -5,6 +5,7 @@ local_storage.setStoragePrefix('stackwalker'); // Before requiring anything else
 
 const querystring = require('query-string');
 const stack_mapper = require('stack-mapper');
+const UAParser = require('ua-parser-js');
 
 let error_report_regex = /^([^ ]+) \[([^\]]+)] "POST ([^"?]+)?([^"]+)" START "([^"]+)" "([^"]+)"$/;
 let fileline_regexs = [
@@ -144,6 +145,31 @@ function cleanTimestamp(timestamp) {
   return timestamp;
 }
 
+function identity(a) {
+  return a;
+}
+
+function addUAFields(parts, arr) {
+  let str = arr.filter(identity).join(' ');
+  if (str) {
+    parts.push(str);
+  }
+}
+
+function friendlyUA(ua) {
+  let parts = [];
+  let data = new UAParser(ua);
+  let browser = data.getBrowser();
+  addUAFields(parts, [browser.name, browser.version]);
+  let device = data.getDevice();
+  addUAFields(parts, [device.model, device.type, device.vendor]);
+  let os = data.getOS();
+  addUAFields(parts, [os.name, os.version]);
+  parts.push(`Raw=${ua}`);
+
+  return `UA=${parts.join(', ')}`;
+}
+
 function preparseGcloud(json, ignore_list) {
   let ret = [];
   let ignore_cidx = ignore_list.indexOf('CIDX') !== -1;
@@ -169,10 +195,10 @@ function preparseGcloud(json, ignore_list) {
       autoloadSourcemapsForVersion(record.resource.labels.cluster_name, query.build || query.ver);
     }
     ret.push(`${cleanTimestamp(timestamp)}${query.pos ? ` pos=${query.pos}` : ''} URL=${userURL(query.url)}`);
-    if (query.platform) {
-      ret.push(`platform=${query.platform} UserAgent=${query.ua}`);
+    if (query.platform && query.platform !== 'web') {
+      ret.push(`${query.platform} ${friendlyUA(query.ua)}`);
     } else {
-      ret.push(`UserAgent=${query.ua}`);
+      ret.push(friendlyUA(query.ua));
     }
     let header = headerFromQuery(query);
     if (header.length) {

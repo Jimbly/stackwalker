@@ -52,7 +52,13 @@ function headerFromQuery(query) {
     header.push('DISCONNECTED');
   }
   if (query.ver) {
-    header.push(`ver=${query.ver}`);
+    if (query.build) {
+      header.push(`ver=${query.build}(${query.ver})`);
+    } else {
+      header.push(`ver=${query.ver}`);
+    }
+  } else if (query.build) {
+    header.push(`build=${query.build}`);
   }
   if (query.user_id) {
     header.push(`user_id=${query.user_id}`);
@@ -159,11 +165,15 @@ function preparseGcloud(json, ignore_list) {
     if (ignore_disconnected && query.disconnected) {
       continue;
     }
-    if (query.ver && record.resource?.labels?.cluster_name) {
-      autoloadSourcemapsForVersion(record.resource.labels.cluster_name, query.ver);
+    if ((query.build || query.ver) && record.resource?.labels?.cluster_name) {
+      autoloadSourcemapsForVersion(record.resource.labels.cluster_name, query.build || query.ver);
     }
     ret.push(`${cleanTimestamp(timestamp)}${query.pos ? ` pos=${query.pos}` : ''} URL=${userURL(query.url)}`);
-    ret.push(`UserAgent=${query.ua}`);
+    if (query.platform) {
+      ret.push(`platform=${query.platform} UserAgent=${query.ua}`);
+    } else {
+      ret.push(`UserAgent=${query.ua}`);
+    }
     let header = headerFromQuery(query);
     if (header.length) {
       ret.push(header.join(', '));
@@ -358,6 +368,9 @@ export function main() {
       sourcemap_data[idx] = JSON.parse(text);
     } catch (e) {
       upload_status.textContent = 'Status: Error parsing Sourcemap';
+      if (text.match(/error/i)) {
+        upload_status.textContent += `: ${text}`;
+      }
       throw e;
     }
     if (sourcemap_data[idx] && sourcemap_data[idx].version === 3) {

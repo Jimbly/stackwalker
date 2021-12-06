@@ -4,7 +4,7 @@ const local_storage = require('./glov/local_storage.js');
 local_storage.setStoragePrefix('stackwalker'); // Before requiring anything else that might load from this
 
 const querystring = require('query-string');
-const stack_mapper = require('stack-mapper');
+const stack_mapper = require('../lib/stack-mapper');
 const UAParser = require('ua-parser-js');
 
 let error_report_regex = /^([^ ]+) \[([^\]]+)] "POST ([^"?]+)?([^"]+)" START "([^"]+)" "([^"]+)"$/;
@@ -352,7 +352,7 @@ export function main() {
     let to_process = [];
     for (let ii = 0; ii < stack_frames.length; ++ii) {
       let elem = stack_frames[ii];
-      if (elem.filename) {
+      if (elem.filename && elem.line) {
         line_mapping[ii] = to_process.length;
         to_process.push({
           filename: elem.filename,

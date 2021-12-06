@@ -4,7 +4,7 @@ const local_storage = require('./glov/local_storage.js');
 local_storage.setStoragePrefix('stackwalker'); // Before requiring anything else that might load from this
 
 const querystring = require('query-string');
-const stack_mapper = require('../lib/stack-mapper');
+const stack_mapper = require('../lib/stack-mapper/index.js');
 const UAParser = require('ua-parser-js');
 
 let error_report_regex = /^([^ ]+) \[([^\]]+)] "POST ([^"?]+)?([^"]+)" START "([^"]+)" "([^"]+)"$/;

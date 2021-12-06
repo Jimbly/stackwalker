@@ -52,6 +52,9 @@ function headerFromQuery(query) {
   if (query.disconnected) {
     header.push('DISCONNECTED');
   }
+  if (query.modapi_cdata) {
+    header.push('MODDED');
+  }
   if (query.ver) {
     if (query.build) {
       header.push(`ver=${query.build}(${query.ver})`);

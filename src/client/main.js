@@ -46,7 +46,7 @@ function jsonParse(text) {
 
 function headerFromQuery(query) {
   let header = [];
-  if (query.cidx && query.cidx !== '1') {
+  if (query.cidx && query.cidx !== '1' && query.cidx !== '0') {
     header.push(`CIDX=${query.cidx}`);
   }
   if (query.disconnected) {
@@ -175,8 +175,6 @@ function friendlyUA(ua) {
 
 function preparseGcloud(json, ignore_list) {
   let ret = [];
-  let ignore_cidx = ignore_list.indexOf('CIDX') !== -1;
-  let ignore_disconnected = ignore_list.indexOf('DISCONNECTED') !== -1;
   for (let ii = 0; ii < json.length; ++ii) {
     let record = json[ii];
     let { timestamp } = record;
@@ -188,40 +186,50 @@ function preparseGcloud(json, ignore_list) {
     if (ignored(ignore_list, query.msg)) {
       continue;
     }
-    if (ignore_cidx && query.cidx && query.cidx !== '1') {
-      continue;
-    }
-    if (ignore_disconnected && query.disconnected) {
-      continue;
-    }
     if ((query.build || query.ver) && record.resource?.labels?.cluster_name) {
       autoloadSourcemapsForVersion(record.resource.labels.cluster_name, query.build || query.ver);
     }
-    ret.push(`${cleanTimestamp(timestamp)}${query.pos ? ` pos=${query.pos}` : ''} URL=${userURL(query.url)}`);
-    if (query.platform && query.platform !== 'web') {
-      ret.push(`${query.platform} ${friendlyUA(query.ua)}`);
-    } else {
-      ret.push(friendlyUA(query.ua));
+    let subsection = [];
+    let top_line = `${cleanTimestamp(timestamp)}${query.pos ? ` pos=${query.pos}` : ''} URL=${userURL(query.url)}`;
+    if (ignored(ignore_list, top_line)) {
+      continue;
     }
+    subsection.push(top_line);
+    let ua_line = friendlyUA(query.ua);
+    if (query.platform && query.platform !== 'web') {
+      ua_line = `${query.platform} ${ua_line}`;
+    }
+    if (ignored(ignore_list, ua_line)) {
+      continue;
+    }
+    subsection.push(ua_line);
     let header = headerFromQuery(query);
     if (header.length) {
-      ret.push(header.join(', '));
+      header = header.join(', ');
+      if (ignored(ignore_list, header)) {
+        continue;
+      }
+      subsection.push(header);
     }
     let header2 = header2FromQuery(query);
     if (header2.length) {
-      ret.push(header2.join(', '));
+      header2 = header2.join(', ');
+      if (ignored(ignore_list, header2)) {
+        continue;
+      }
+      subsection.push(header2);
     }
     if (query.file) {
       let m = query.file.match(/[^/]+$/);
-      ret.push(prettyFileLine({
+      subsection.push(prettyFileLine({
         filename: m && m[0],
         line: query.line,
         column: query.col,
       }));
     }
-    ret = ret.concat(query.msg.split('\n'));
-
-    ret.push('');
+    subsection = subsection.concat(query.msg.split('\n'));
+    subsection.push('');
+    ret = ret.concat(subsection);
   }
 
   return ret.join('\n');

@@ -28,11 +28,17 @@ function prettyFileLine(a) {
 function parseIgnoreList(text) {
   let lines = text.split('\n').filter((a) => a.trim());
   return lines.map((a) => {
-    if (a[0] === '/') {
-      return new RegExp(a);
-    } else {
-      return a;
+    let ret = {};
+    if (a[0] === '=') {
+      a = a.slice(1);
+      ret.matcher = true;
     }
+    if (a[0] === '/') {
+      ret.regex = new RegExp(a);
+    } else {
+      ret.str = a;
+    }
+    return ret;
   });
 }
 
@@ -84,17 +90,43 @@ function header2FromQuery(query) {
   return header;
 }
 
+function matchReset(list) {
+  for (let ii = 0; ii < list.length; ++ii) {
+    if (list[ii].matcher) {
+      list[ii].matched = false;
+    }
+  }
+}
+
+function matchPass(list) {
+  for (let ii = 0; ii < list.length; ++ii) {
+    if (list[ii].matcher && !list[ii].matched) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function ignored(list, text) {
   if (!text) {
     return false;
   }
   for (let ii = 0; ii < list.length; ++ii) {
-    if (list[ii] instanceof RegExp) {
-      if (text.match(list[ii])) {
+    let elem = list[ii];
+    let matches = false;
+    if (elem.regex) {
+      if (text.match(elem.regex)) {
+        matches = true;
+      }
+    } else if (text.indexOf(elem.str) !== -1) {
+      matches = true;
+    }
+    if (matches) {
+      if (elem.matcher) {
+        elem.matched = true;
+      } else {
         return true;
       }
-    } else if (text.indexOf(list[ii]) !== -1) {
-      return true;
     }
   }
   return false;
@@ -183,6 +215,7 @@ function preparseGcloud(json, ignore_list) {
     if (query.payload) {
       query = query.payload;
     }
+    matchReset(ignore_list);
     if (ignored(ignore_list, query.msg)) {
       continue;
     }
@@ -229,7 +262,9 @@ function preparseGcloud(json, ignore_list) {
     }
     subsection = subsection.concat(query.msg.split('\n'));
     subsection.push('');
-    ret = ret.concat(subsection);
+    if (matchPass(ignore_list)) {
+      ret = ret.concat(subsection);
+    }
   }
 
   return ret.join('\n');
@@ -244,7 +279,8 @@ function preparse(text, ignore_list) {
   let ret = [];
   for (let ii = 0; ii < lines.length; ++ii) {
     let line = lines[ii];
-    if (ignored(ignore_list, line)) {
+    matchReset(ignore_list);
+    if (ignored(ignore_list, line) || !matchPass(ignore_list)) {
       continue;
     }
     let m = line.match(error_report_regex);

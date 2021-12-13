@@ -142,6 +142,13 @@ function userURL(url) {
 
 let setSourcemapData;
 let upload_status;
+let error_status;
+let error_text = '';
+function errorMessage(msg) {
+  upload_status.textContent = msg;
+  error_text += `\n${msg}`;
+  error_status.textContent = error_text;
+}
 const SOURCEMAP_SERVER = 'http://localhost:3500/sourcemap/';
 function autoloadSourcemap(path) {
   if (!SOURCEMAP_SERVER) {
@@ -155,7 +162,7 @@ function autoloadSourcemap(path) {
     upload_status.textContent = `Auto-loaded ${path}`;
   };
   xhr.onerror = () => {
-    upload_status.textContent = `Error auto-loading ${path}`;
+    errorMessage(`Error auto-loading ${path}`);
   };
   xhr.send(null);
 }
@@ -346,6 +353,8 @@ export function main() {
     document.getElementById('upload3'),
   ];
   upload_status = document.getElementById('upload_status');
+  error_status = document.getElementById('error_status');
+
   let stack = document.getElementById('stack');
   let ignore = document.getElementById('ignore');
   let frames_bundle = document.getElementById('frames_bundle');
@@ -440,18 +449,20 @@ export function main() {
     try {
       sourcemap_data[idx] = JSON.parse(text);
     } catch (e) {
-      upload_status.textContent = 'Status: Error parsing Sourcemap';
       if (text.match(/error/i)) {
-        upload_status.textContent += `: ${text}`;
+        errorMessage(`Error parsing Sourcemap: ${text}`);
+        return;
+      } else {
+        upload_status.textContent = 'Status: Error parsing Sourcemap';
+        throw e;
       }
-      throw e;
     }
     if (sourcemap_data[idx] && sourcemap_data[idx].version === 3) {
       upload_status.textContent = 'Status: Sourcemap loaded';
       stackmapper[idx] = stack_mapper(sourcemap_data[idx]);
       //local_storage.setJSON('sourcemap', sourcemap_data);
     } else {
-      upload_status.textContent = 'Status: Error parsing Sourcemap (expected version: 3)';
+      errorMessage('Error parsing Sourcemap (expected version: 3)');
     }
     update();
   };
@@ -530,6 +541,8 @@ export function main() {
   });
 
   function onStackChange(ev) {
+    error_text = [];
+    error_status.textContent = '';
     if (ev.target.value.startsWith('(loaded ')) {
       // ignore, leave stack_data
     } else {

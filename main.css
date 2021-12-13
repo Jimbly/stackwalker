@@ -56,3 +56,7 @@ option.disabled {
 #upload_status {
   color: #888;
 }
+#error_status {
+  color: #844;
+  white-space: pre-wrap;
+}

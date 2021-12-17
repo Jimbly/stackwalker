@@ -17,6 +17,8 @@ let fileline_regexs = [
 ];
 // at Object.replaceVideoShadowStyle (<anonymous>:1:3601)
 
+let error_status;
+
 function prettyFileLine(a) {
   if (a.fn) {
     return `${a.fn} (${a.filename}:${a.line}:${a.column})`;
@@ -25,21 +27,34 @@ function prettyFileLine(a) {
   }
 }
 
+let was_regex_error = false;
 function parseIgnoreList(text) {
   let lines = text.split('\n').filter((a) => a.trim());
-  return lines.map((a) => {
+  let need_clear = was_regex_error;
+  was_regex_error = false;
+  let parsed = lines.map((a) => {
     let ret = {};
     if (a[0] === '=') {
       a = a.slice(1);
       ret.matcher = true;
     }
     if (a[0] === '/') {
-      ret.regex = new RegExp(a);
+      try {
+        ret.regex = new RegExp(a.slice(1));
+      } catch (e) {
+        ret.str = a;
+        error_status.textContent = `\n${e}`;
+        was_regex_error = true;
+      }
     } else {
       ret.str = a;
     }
     return ret;
   });
+  if (need_clear && !was_regex_error) {
+    error_status.textContent = '';
+  }
+  return parsed;
 }
 
 function jsonParse(text) {
@@ -142,7 +157,6 @@ function userURL(url) {
 
 let setSourcemapData;
 let upload_status;
-let error_status;
 let error_text = '';
 function errorMessage(msg) {
   upload_status.textContent = msg;

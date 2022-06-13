@@ -91,6 +91,9 @@ function headerFromQuery(query) {
   if (query.client_id) {
     header.push(`client_id=${query.client_id}`);
   }
+  if (query.ip) {
+    header.push(`ip=${query.ip}`);
+  }
   return header;
 }
 

@@ -9,6 +9,8 @@ module.exports = {
   client_static: [
     'client/**/*.html',
     'client/**/*.css',
+    'client/**/*.png',
+    'client/**/*.ico',
   ],
   client_vendor: ['client/**/vendor/**'],
   bundles: [{

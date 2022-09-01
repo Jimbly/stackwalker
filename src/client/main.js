@@ -151,9 +151,16 @@ function ignored(list, text) {
 }
 
 function userURL(url) {
-  let m = url.match(/[^?]+\/(.*)/);
+  let m = url.match(/\/\/([^/]+)\/(.+)/);
   if (m) {
-    return m[1];
+    // let domain = m[1];
+    let rest = m[2];
+    let m2 = rest.match(/index\.html\??(.*)/);
+    if (m2) {
+      return m2[1];
+    } else {
+      return rest;
+    }
   }
   return url;
 }

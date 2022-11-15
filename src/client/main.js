@@ -357,9 +357,13 @@ function parseStack(text, ignore_list) {
       m = line.match(fileline_regexs[ii]);
     }
     if (m) {
+      let filename = m[2];
+      if (filename.indexOf('?') !== -1) {
+        filename = filename.slice(0, filename.indexOf('?'));
+      }
       return {
         fn: m[1],
-        filename: m[2],
+        filename,
         line: m[3],
         column: m[4] ? Number(m[4]) : undefined,
         tooltip: line,

@@ -174,7 +174,7 @@ function errorMessage(msg) {
   error_status.textContent = error_text;
 }
 const SOURCEMAP_SERVER = 'http://localhost:3500/sourcemap/';
-function autoloadSourcemap(path) {
+function autoloadSourcemap(path, ver) {
   if (!SOURCEMAP_SERVER) {
     return;
   }
@@ -203,9 +203,9 @@ function autoloadSourcemapsForVersion(cluster, ver) {
   }
   autoloaded_sourcemaps[key] = true;
 
-  autoloadSourcemap(`${cluster}/${ver}/app.bundle.js.map`);
-  autoloadSourcemap(`${cluster}/${ver}/app_deps.bundle.js.map`);
-  autoloadSourcemap(`${cluster}/${ver}/worker.bundle.js.map`);
+  autoloadSourcemap(`${cluster}/${ver}/app.bundle.js.map`, ver);
+  autoloadSourcemap(`${cluster}/${ver}/app_deps.bundle.js.map`, ver);
+  autoloadSourcemap(`${cluster}/${ver}/worker.bundle.js.map`, ver);
 }
 
 function cleanTimestamp(timestamp) {
@@ -355,7 +355,13 @@ function preparse(text, ignore_list) {
 function parseStack(text, ignore_list) {
   text = preparse(text, ignore_list);
   let lines = text.split('\n');
+  let ver = 0;
   lines = lines.map((line) => {
+    if (!line) {
+      ver = 0;
+    } else if (line.match(/ver=(\d+)/)) {
+      ver = line.match(/ver=(\d+)/)[1];
+    }
     let m;
     for (let ii = 0; !m && ii < fileline_regexs.length; ++ii) {
       m = line.match(fileline_regexs[ii]);
@@ -371,6 +377,7 @@ function parseStack(text, ignore_list) {
         line: m[3],
         column: m[4] ? Number(m[4]) : undefined,
         tooltip: line,
+        ver,
       };
     }
     return { err: line, tooltip: line };
@@ -446,15 +453,22 @@ export function main() {
           filename: elem.filename,
           line: elem.line,
           column: elem.column ? elem.column - 1 : undefined, // the - 1 seems to help map to the right line a lot
+          for_ver: elem.ver,
         });
       }
     }
-    let outs = [];
     for (let ii = 0; ii < stackmapper.length; ++ii) {
       if (stackmapper[ii]) {
-        outs[ii] = stackmapper[ii].map(to_process);
-        for (let jj = 0; jj < outs[ii].length; ++jj) {
-          assert.equal(outs[ii][jj], to_process[jj]); // this modifies in-place
+        let for_ver = sourcemap_data[ii].for_ver;
+        if (for_ver) {
+          // Only process matching lines
+          let matched = to_process.filter((a) => a.for_ver === for_ver);
+          stackmapper[ii].map(matched); // modifies in-place
+        } else {
+          let out = stackmapper[ii].map(to_process);
+          for (let jj = 0; jj < out.length; ++jj) {
+            assert.equal(out[jj], to_process[jj]); // this modifies in-place
+          }
         }
       }
     }
@@ -474,7 +488,7 @@ export function main() {
     frames_source.raw_lines = raw_lines;
   }
 
-  setSourcemapData = function (idx, text) {
+  setSourcemapData = function (idx, text, for_ver) {
     if (idx === -1) {
       idx = Math.max(3, sourcemap_data.length);
     }
@@ -492,6 +506,7 @@ export function main() {
     if (sourcemap_data[idx] && sourcemap_data[idx].version === 3) {
       upload_status.textContent = 'Status: Sourcemap loaded';
       stackmapper[idx] = stack_mapper(sourcemap_data[idx]);
+      sourcemap_data[idx].for_ver = for_ver;
       //local_storage.setJSON('sourcemap', sourcemap_data);
     } else {
       errorMessage('Error parsing Sourcemap (expected version: 3)');
@@ -565,7 +580,7 @@ export function main() {
       stackmapper[idx] = null;
       reader.onload = (loaded_event) => {
         let text = loaded_event.target.result;
-        setSourcemapData(idx, text);
+        setSourcemapData(idx, text, 0);
       };
 
       reader.readAsText(file_to_load, 'UTF-8');

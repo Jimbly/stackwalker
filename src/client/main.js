@@ -182,8 +182,12 @@ function autoloadSourcemap(path) {
   xhr.withCredentials = false;
   xhr.open('GET', `${SOURCEMAP_SERVER}${path}`, true);
   xhr.onload = () => {
-    setSourcemapData(-1, xhr.responseText);
-    upload_status.textContent = `Auto-loaded ${path}`;
+    if (xhr.status === 200) {
+      setSourcemapData(-1, xhr.responseText, ver);
+      upload_status.textContent = `Auto-loaded ${path}`;
+    } else {
+      errorMessage(`Error auto-loading ${path}: ${xhr.responseText}`);
+    }
   };
   xhr.onerror = () => {
     errorMessage(`Error auto-loading ${path}`);

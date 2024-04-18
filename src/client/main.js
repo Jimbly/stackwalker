@@ -76,6 +76,9 @@ function headerFromQuery(query) {
   if (query.modapi_cdata) {
     header.push('MODDED');
   }
+  if (query.context_lost) {
+    header.push('CtxLost');
+  }
   if (query.ver) {
     if (query.build) {
       header.push(`ver=${query.build}(${query.ver})`);

@@ -243,64 +243,87 @@ function friendlyUA(ua) {
   return `UA=${parts.join(', ')}`;
 }
 
+function preparseEntryShared(record, query, ignore_list) {
+  let { timestamp } = record;
+  matchReset(ignore_list);
+  if (ignored(ignore_list, query.msg)) {
+    return null;
+  }
+  if (query.build || query.ver) {
+    if (record.resource?.labels?.cluster_name) {
+      autoloadSourcemapsForVersion(record.resource.labels.cluster_name, query.build || query.ver);
+    } else if (query.project === 'frvr_edits2') {
+      // HACK: Probably not needed anymore, only needed when loading these lots from the wrong endpoint
+      autoloadSourcemapsForVersion('game-server-cluster1', query.build || query.ver);
+    }
+  }
+  let subsection = [];
+  let top_line = `${cleanTimestamp(timestamp)}${query.pos ? ` pos=${query.pos}` : ''} URL=${userURL(query.url)}`;
+  if (ignored(ignore_list, top_line)) {
+    return null;
+  }
+  subsection.push(top_line);
+  let ua_line = friendlyUA(query.ua);
+  if (query.platform && query.platform !== 'web') {
+    ua_line = `${query.platform} ${ua_line}`;
+  }
+  if (ignored(ignore_list, ua_line)) {
+    return null;
+  }
+  subsection.push(ua_line);
+  let header = headerFromQuery(query);
+  if (header.length) {
+    header = header.join(', ');
+    if (ignored(ignore_list, header)) {
+      return null;
+    }
+    subsection.push(header);
+  }
+  let header2 = header2FromQuery(query);
+  if (header2.length) {
+    header2 = header2.join(', ');
+    if (ignored(ignore_list, header2)) {
+      return null;
+    }
+    subsection.push(header2);
+  }
+  if (query.file) {
+    let m = query.file.match(/[^/]+$/);
+    subsection.push(prettyFileLine({
+      filename: m && m[0],
+      line: query.line,
+      column: query.col,
+    }));
+  }
+  subsection = subsection.concat(query.msg.split('\n'));
+  subsection.push('');
+  if (!matchPass(ignore_list)) {
+    return null;
+  }
+  return subsection;
+}
+
+
+function preparseGlovReportEntry(record, ignore_list) {
+  let query = record;
+  return preparseEntryShared(record, query, ignore_list);
+}
+
+function preparseGcloudEntry(record, ignore_list) {
+  let query = record.jsonPayload;
+  assert(query);
+  if (query.payload) {
+    query = query.payload;
+  }
+  return preparseEntryShared(record, query, ignore_list);
+}
+
 function preparseGcloud(json, ignore_list) {
   let ret = [];
   for (let ii = 0; ii < json.length; ++ii) {
     let record = json[ii];
-    let { timestamp } = record;
-    let query = record.jsonPayload;
-    assert(query);
-    if (query.payload) {
-      query = query.payload;
-    }
-    matchReset(ignore_list);
-    if (ignored(ignore_list, query.msg)) {
-      continue;
-    }
-    if ((query.build || query.ver) && record.resource?.labels?.cluster_name) {
-      autoloadSourcemapsForVersion(record.resource.labels.cluster_name, query.build || query.ver);
-    }
-    let subsection = [];
-    let top_line = `${cleanTimestamp(timestamp)}${query.pos ? ` pos=${query.pos}` : ''} URL=${userURL(query.url)}`;
-    if (ignored(ignore_list, top_line)) {
-      continue;
-    }
-    subsection.push(top_line);
-    let ua_line = friendlyUA(query.ua);
-    if (query.platform && query.platform !== 'web') {
-      ua_line = `${query.platform} ${ua_line}`;
-    }
-    if (ignored(ignore_list, ua_line)) {
-      continue;
-    }
-    subsection.push(ua_line);
-    let header = headerFromQuery(query);
-    if (header.length) {
-      header = header.join(', ');
-      if (ignored(ignore_list, header)) {
-        continue;
-      }
-      subsection.push(header);
-    }
-    let header2 = header2FromQuery(query);
-    if (header2.length) {
-      header2 = header2.join(', ');
-      if (ignored(ignore_list, header2)) {
-        continue;
-      }
-      subsection.push(header2);
-    }
-    if (query.file) {
-      let m = query.file.match(/[^/]+$/);
-      subsection.push(prettyFileLine({
-        filename: m && m[0],
-        line: query.line,
-        column: query.col,
-      }));
-    }
-    subsection = subsection.concat(query.msg.split('\n'));
-    subsection.push('');
-    if (matchPass(ignore_list)) {
+    let subsection = preparseGcloudEntry(record, ignore_list);
+    if (subsection && subsection.length) {
       ret = ret.concat(subsection);
     }
   }
@@ -317,6 +340,13 @@ function preparse(text, ignore_list) {
   let ret = [];
   for (let ii = 0; ii < lines.length; ++ii) {
     let line = lines[ii];
+    if (line[0] === '{' && (json = jsonParse(line))) {
+      let subsection = preparseGlovReportEntry(json, ignore_list);
+      if (subsection && subsection.length) {
+        ret = ret.concat(subsection);
+      }
+      continue;
+    }
     matchReset(ignore_list);
     if (ignored(ignore_list, line) || !matchPass(ignore_list)) {
       continue;

@@ -341,7 +341,12 @@ function preparse(text, ignore_list) {
   for (let ii = 0; ii < lines.length; ++ii) {
     let line = lines[ii];
     if (line[0] === '{' && (json = jsonParse(line))) {
-      let subsection = preparseGlovReportEntry(json, ignore_list);
+      let subsection;
+      if (json.jsonPayload?.payload) {
+        subsection = preparseGcloudEntry(json, ignore_list);
+      } else {
+        subsection = preparseGlovReportEntry(json, ignore_list);
+      }
       if (subsection && subsection.length) {
         ret = ret.concat(subsection);
       }

@@ -86,7 +86,7 @@ function headerFromQuery(query) {
       header.push(`ver=${query.ver}`);
     }
   } else if (query.build) {
-    header.push(`build=${query.build}`);
+    header.push(`ver=${query.build}`);
   }
   if (query.user_id) {
     header.push(`user_id=${query.user_id}`);
@@ -189,7 +189,11 @@ function autoloadSourcemap(path, ver) {
       setSourcemapData(-1, xhr.responseText, ver);
       upload_status.textContent = `Auto-loaded ${path}`;
     } else {
-      errorMessage(`Error auto-loading ${path}: ${xhr.responseText}`);
+      if (path.includes('worker')) {
+        // doesn't exist for some projects, silently ignore
+      } else {
+        errorMessage(`Error auto-loading ${path}: ${xhr.responseText}`);
+      }
     }
   };
   xhr.onerror = () => {

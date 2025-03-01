@@ -199,16 +199,16 @@ function autoloadSourcemap(path, ver) {
 }
 
 let autoloaded_sourcemaps = {};
-function autoloadSourcemapsForVersion(cluster, ver) {
-  let key = `${cluster}#${ver}`;
+function autoloadSourcemapsForVersion(cluster_or_project, ver) {
+  let key = `${cluster_or_project}#${ver}`;
   if (autoloaded_sourcemaps[key]) {
     return;
   }
   autoloaded_sourcemaps[key] = true;
 
-  autoloadSourcemap(`${cluster}/${ver}/app.bundle.js.map`, ver);
-  autoloadSourcemap(`${cluster}/${ver}/app_deps.bundle.js.map`, ver);
-  autoloadSourcemap(`${cluster}/${ver}/worker.bundle.js.map`, ver);
+  autoloadSourcemap(`${cluster_or_project}/${ver}/app.bundle.js.map`, ver);
+  autoloadSourcemap(`${cluster_or_project}/${ver}/app_deps.bundle.js.map`, ver);
+  autoloadSourcemap(`${cluster_or_project}/${ver}/worker.bundle.js.map`, ver);
 }
 
 function cleanTimestamp(timestamp) {
@@ -255,6 +255,8 @@ function preparseEntryShared(record, query, ignore_list) {
     } else if (query.project === 'frvr_edits2') {
       // HACK: Probably not needed anymore, only needed when loading these lots from the wrong endpoint
       autoloadSourcemapsForVersion('game-server-cluster1', query.build || query.ver);
+    } else if (query.project) {
+      autoloadSourcemapsForVersion(query.project, query.build || query.ver);
     }
   }
   let subsection = [];

@@ -1,10 +1,10 @@
-const argv = require('minimist')(process.argv.slice(2));
-const express = require('express');
-const express_static_gzip = require('express-static-gzip');
 const fs = require('fs');
 const http = require('http');
 const https = require('https');
 const path = require('path');
+const express = require('express');
+const express_static_gzip = require('express-static-gzip');
+const argv = require('minimist')(process.argv.slice(2));
 
 let app = express();
 let server = http.createServer(app);

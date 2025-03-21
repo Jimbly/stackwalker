@@ -1,11 +1,11 @@
-const argv = require('minimist')(process.argv.slice(2));
+const path = require('path');
+const gb = require('glov-build');
 const babel = require('glov-build-babel');
+const argv = require('minimist')(process.argv.slice(2));
 const appBundle = require('./app-bundle.js');
 const config = require('./config.js');
-const gb = require('glov-build');
 const eslint = require('./eslint.js');
 const exec = require('./exec.js');
-const path = require('path');
 const uglify = require('./uglify.js');
 
 const targets = {
@@ -157,7 +157,7 @@ gb.task({
   version: Date.now(), // always runs once per process
   init: function (next) {
     if (!bs) {
-      // eslint-disable-next-line global-require
+      // eslint-disable-next-line n/global-require
       bs = require('browser-sync').create();
     }
     next();

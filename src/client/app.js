@@ -1,4 +1,4 @@
-/* eslint global-require:off */
+/* eslint n/global-require:off */
 
 // Startup code.
 

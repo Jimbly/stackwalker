@@ -1,11 +1,13 @@
 /* eslint no-useless-catch:off */
+/* globals XMLHttpRequest */
 const assert = require('assert');
+// eslint-disable-next-line import/order
 const local_storage = require('./glov/local_storage.js');
 local_storage.setStoragePrefix('stackwalker'); // Before requiring anything else that might load from this
 
 const querystring = require('query-string');
-const stack_mapper = require('../lib/stack-mapper/index.js');
 const UAParser = require('ua-parser-js');
+const stack_mapper = require('../lib/stack-mapper/index.js');
 
 let error_report_regex = /^([^ ]+) \[([^\]]+)] "POST ([^"?]+)?([^"]+)" START "([^"]+)" "([^"]+)"$/;
 let fileline_regexs = [

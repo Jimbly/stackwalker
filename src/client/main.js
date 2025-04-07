@@ -12,6 +12,7 @@ const stack_mapper = require('../lib/stack-mapper/index.js');
 let error_report_regex = /^([^ ]+) \[([^\]]+)] "POST ([^"?]+)?([^"]+)" START "([^"]+)" "([^"]+)"$/;
 let fileline_regexs = [
   /(.)([^(/:]+)\((\d+):(\d+)\)$/,
+  /(.)([^(/:]+)\((\d+):undefined\)$/,
   ///(?:at ([^(]+) \(.*\/)?([^(/:]+):(\d+)(?::(\d+))?\)$/,
   /(?:at ([^(]+) \((?:.*\/)?)?([^(/:]+):(\d+)(?::(\d+))?\)$/,
   /\/*([^/@]+)\/*@.*\/([^(/:]+):(\d+)(?::(\d+))?$/,
@@ -498,7 +499,7 @@ export function main() {
         to_process.push({
           filename: elem.filename,
           line: elem.line,
-          column: elem.column ? elem.column - 1 : undefined, // the - 1 seems to help map to the right line a lot
+          column: elem.column ? elem.column - 1 : 0, // the - 1 seems to help map to the right line a lot
           for_ver: elem.ver,
         });
       }
